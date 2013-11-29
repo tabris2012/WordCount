@@ -4,71 +4,70 @@
 require 'socket'
 
 class WordCount
-  def initialize(discription_hash, word_borders)
-    @socket = TCPSocket.open("localhost", 7070) #GENIA通信用ソケット
-    @original_hash = discription_hash
-    @set_borders = word_borders
-    
-    run_process
+  def initialize(data, wordcount_criteria)
+    # data must be a hash of which keys are exp_id and values are design_description
+    # wordcount_criteria must be an array of numbers without starting zero
+    @socket = TCPSocket.open("localhost", 7070)
+    @data = data
+    @wordcount_criteria = wordcount_criteria
+    raise NameError if wordcount_criteria.first == 0
   end
   
   def run_process
-    sorted_id = sort_words #ハッシュの文章の単語数でソート
-    words_arrays = divide_words(sorted_id) #文章の単語数を指定の境界で切る
-    dump_id_discription(words_arrays) #単語数ごとに分割して出力
-    run_genia #外部GENIA起動
+    word_counted = wordcount
+    grouped_data = group_by_criteria(word_counted)
     
-    words_arrays.each_with_index do |id_words, i|
-      words_freq = getWordsFreq(id_words)
-      dumpWordsFreq(words_freq, @set_borders[i]) #設定境界で単語数出力
+    run_genia
+    word_freq = grouped_data.map do |words_array|
+      get_words_freq(words_array)
     end
   end
   
-  def sort_words
-    #ハッシュの文章単語数を回収
-    words_hash = Hash.new
-    @original_hash.each do |id, discription|
-      num_of_words = discription.split(/\s+/).length
-      words_hash[id] = num_of_words
+  def count_words
+    # remove items with no description, return array of description and wordcount
+    words_with_num = @data.map do |id, description|
+      num_of_words = wordcounter(description)
+      [id, description, num_of_words] if num_of_words != 0
     end
-    
-    words_hash.sort_by{|id,num| num }.select{|id_num| id_num[1] != 0 }.compact
+    words_with_num.compact
   end
   
-  def divide_words(sorted_id)
-    words_arrays = Array.new
-    border_pos = 0 #境界配列の現在参照
-    last_border = 0 #前回の境界位置
-    
-    sorted_id.each_with_index do |(id, words), i|
-      if words > @set_borders[border_pos]
-        words_arrays.push(sorted_id.slice(last_border...i))
-        border_pos +=1
-        last_border = i #境界位置記憶
-        
-        if border_pos > @set_borders.length
-          break #サイズを超えたら終了
-        end
+  def wordcounter(description)
+    description.split(/\s+/).size
+  end
+  
+  def group_by_criteria(word_counted)
+    # items grouped by num_of_words and return an array of non-redundant description
+    @wordcount_criteria.map.with_index do |upper_limit, index|
+      lower_limit = index == 0 ? 0 : @wordcount_criteria[index - 1]
+      members = word_counted.select do |array|
+        size = array[2]
+        lower_limit < size && size =< upper_limit
       end
-      #最後を追加
-      words_arrays.push(sorted_id.slice(last_border..-1))
-      return word_borders
+      members.map{|array| select_distinct(array[1]) }
     end
-    
   end
   
-  def run_genia #子プロセスでGENIA起動
+  def no_description
+    @data.select{|id, description| wordcounter(description) == 0 }
+  end
+  
+  def run_genia
     pid = fork #子プロセス実体化
-    
-    if pid.nil? #子プロセスで処理
+    if !pid #子プロセスで処理
       system("ruby ../GENIA_server/GENIA_server.rb")      
       exit!(0) #子プロセス終了
     end
   end
+  
+  def get_words_freq
+    word_freq = grouped_data.map do |words_array|
+      get_words_freq(words_array)
+    end
+  end
 end
 
-#以下エントリーポイント
-if __FILE__==$0
+if __FILE__ == $0
   dummy_hash = Hash.new #{id番号, 文章}...
   dummy_borders = [20, 40, 60];
   
