@@ -2,11 +2,13 @@
 # coding: utf-8
 
 require 'socket'
+require 'json'
 
 class WordCount
   def initialize(data, wordcount_criteria)
     # data must be a hash of which keys are exp_id and values are design_description
     # wordcount_criteria must be an array of numbers without starting zero
+    @out_dir = "./result"
     @socket = TCPSocket.open("localhost", 7070)
     @data = data
     @wordcount_criteria = wordcount_criteria
@@ -14,13 +16,16 @@ class WordCount
   end
   
   def run_process
-    word_counted = wordcount
+    word_counted = count_words
     grouped_data = group_by_criteria(word_counted)
     
     run_genia
-    word_freq = grouped_data.map do |words_array|
-      get_words_freq(words_array)
+    grouped_data.each do |id_words|
+      id, words = id_words
+      result = get_word_freq(words)
+      open(File.join(@out_dir, id + "_result")){|f| f.puts(result) }
     end
+    @socket.close
   end
   
   def count_words
@@ -44,7 +49,9 @@ class WordCount
         size = array[2]
         lower_limit < size && size =< upper_limit
       end
-      members.map{|array| select_distinct(array[1]) }
+      
+      non_redundant = members.map{|array| select_distinct(array[1]) }
+      [upper_limit, non_redundant]
     end
   end
   
@@ -60,16 +67,18 @@ class WordCount
     end
   end
   
-  def get_words_freq
-    word_freq = grouped_data.map do |words_array|
-      get_words_freq(words_array)
-    end
+  def get_word_freq(words_array)
+    bag_of_words = words_array.flatten.join("\s")
+    @socket.puts bag_of_words
+    @socket.gets.gsub(" ", "\n").chomp
   end
 end
 
 if __FILE__ == $0
-  dummy_hash = Hash.new #{id番号, 文章}...
-  dummy_borders = [20, 40, 60];
-  
-  word_count = WordCount.new(dummy_hash, dummy_borders)
+  data = open(ARGV.first){|f| JSON.load(f) }
+  criteria = [20, 40, 60];
+
+  wc = WordCount.new(data, criteria)
+  nodesc = wc.no_description
+  result = wc.run_process
 end
