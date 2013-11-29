@@ -1,5 +1,6 @@
 #!/usr/bin/ruby
 # coding: utf-8
+
 require 'socket'
 
 class WordCount
@@ -23,7 +24,16 @@ class WordCount
     end
   end
   
-  
+  def sort_words
+    #ハッシュの文章単語数を回収
+    words_hash = Hash.new
+    @original_hash.each do |id, discription|
+      num_of_words = discription.split(/\s+/).length
+      words_hash[id] = num_of_words
+    end
+    
+    words_hash.sort_by{|id,num| num }.select{|id_num| id_num[1] != 0 }.compact
+  end
   
   def divide_words(sorted_id)
     words_arrays = Array.new
@@ -47,25 +57,6 @@ class WordCount
     
   end
   
-  def sort_words #ハッシュの文章単語数を回収
-    words_hash = Hash.new #単語数保存用のハッシュを作成
-    
-    @original_hash.each do |id, discription|
-      words = discription.split(/\s+/).length #スペースで区切って単語数
-      words_hash[id] = words
-    end
-    
-    word_list = words_hash.sort{|a,b| a[1] <=> b[1]}
-    
-    word_list.each_with_index do |(id, words), i|
-      if words > 0 #単語数0より大きくなったら
-        break
-      end
-    end
-    
-    word_list = word_list.slice(i..-1)
-  end
-  
   def run_genia #子プロセスでGENIA起動
     pid = fork #子プロセス実体化
     
@@ -74,7 +65,6 @@ class WordCount
       exit!(0) #子プロセス終了
     end
   end
-  
 end
 
 #以下エントリーポイント
