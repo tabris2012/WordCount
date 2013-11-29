@@ -1,5 +1,6 @@
 #!/usr/bin/ruby
 # coding: utf-8
+
 require 'webrick'
 
 def readlines_until_empty_line(io, line_num) #geniaソケットから回収
@@ -22,6 +23,7 @@ trap(:INT) do
   server.shutdown
   genia.close
 end
+
 server.start do |socket|
   while line = socket.gets #一行読込む
     line_num  = 1+line.scan(". ").size
