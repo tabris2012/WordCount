@@ -52,7 +52,6 @@ class WordCount
     word_list = Hash.new #出現単語数を数えるハッシュ
     
     id_words.each do |id, num|
-      puts @original_hash[id]
       result = @genia.tagger_sentence(@original_hash[id]).chomp
       
       result.each_line do |line|
