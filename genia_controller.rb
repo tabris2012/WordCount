@@ -1,13 +1,16 @@
-# coding: utf-8
+# -*- coding: utf-8 -*-
 
-class GENIA_controller
-  def initialize(genia_pass)
-    @genia = IO.popen("cd "+ genia_pass +" ; ./geniatagger 2>/dev/null", "r+")
+class GENIAController
+  def initialize(genia_path)
+    @genia = IO.popen("cd " + genia_path + " ; ./geniatagger 2>/dev/null", "r+")
   end
   
-  def tagger_sentence(sentence) #英文を受取り、品詞解析結果を返す
-    line_num  = 1+sentence.scan("\n").size #文の数を数える
-    @genia.print sentence + "\n" #行末で改行してgeniaプロセスに投げ込む
+  def tagger_sentence(sentence)
+    # count line number
+    line_num  = 1 + sentence.scan("\n").size
+    
+    # 行末で改行してgeniaプロセスに投げ込む
+    @genia.print sentence + "\n"
     
     result = []
     while line = @genia.gets
@@ -20,7 +23,7 @@ class GENIA_controller
       end
     end
 
-    return result.join
+    result.join
   end
 end
 
@@ -28,7 +31,7 @@ end
 #以下エントリーポイント
 if __FILE__==$0
   sentence = "This is a pen! You can use it."
-  genia = GENIA_controller.new("../GENIA_server")
+  genia = GENIAController.new("../GENIA_server")
   puts genia.tagger_sentence(sentence)
   puts genia.tagger_sentence("Additional sentence can be tagged.\n")
 end

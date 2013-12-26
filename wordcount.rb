@@ -5,7 +5,7 @@ require "json"
 
 class WordCount
   def initialize(genia_path, description_hash, word_borders)
-    @genia = GENIA_controller.new(genia_path)
+    @genia = GENIAController.new(genia_path)
     @original_hash = description_hash
     @set_borders = word_borders
   end
