@@ -23,5 +23,5 @@ if __FILE__ == $0
   id_desc = Parallel.map(list_xml_path) do |xml_path|
     parse_design(xml_path)
   end
-  open("./result.json"){|f| JSON.dump(id_desc, f)}
+  open("./result.json","w"){|f| JSON.dump(id_desc.flatten(1), f) }
 end
