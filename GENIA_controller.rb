@@ -1,8 +1,8 @@
 # coding: utf-8
 
 class GENIA_controller
-  def initialize(genia_pass)
-    @genia = IO.popen("cd "+ genia_pass +" ; ./geniatagger 2>/dev/null", "r+")
+  def initialize(genia_path)
+    @genia = IO.popen("cd "+ genia_path +" ; ./geniatagger 2>/dev/null", "r+")
   end
   
   def tagger_sentence(sentence) #英文を受取り、品詞解析結果を返す
