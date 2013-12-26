@@ -11,7 +11,6 @@ class GENIA_controller
     
     result = []
     while line = @genia.gets
-      puts line
       if line == "\n"
         line_num -=1 #残り行数を減らす
         break if line_num == 0
