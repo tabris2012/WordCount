@@ -1,84 +1,162 @@
 #!/usr/bin/ruby
 # coding: utf-8
 
-require 'socket'
-require 'json'
+require 'fileutils'
+require './GENIA_controller'
 
 class WordCount
-  def initialize(data, wordcount_criteria)
-    # data must be a hash of which keys are exp_id and values are design_description
-    # wordcount_criteria must be an array of numbers without starting zero
-    @out_dir = "./result"
-    @socket = TCPSocket.open("localhost", 7070)
-    @data = data
-    @wordcount_criteria = wordcount_criteria
-    raise NameError if wordcount_criteria.first == 0
+  def initialize(discription_hash, word_borders)
+    @genia = GENIA_controller.new("../GENIA_server") #GENIAで品詞解析
+    @original_hash = discription_hash
+    @set_borders = word_borders
+    
+    run_process
   end
   
   def run_process
-    word_counted = count_words
-    grouped_data = group_by_criteria(word_counted)
+    sorted_id = sort_words #ハッシュの文章の単語数でソート
+    words_arrays = divide_words(sorted_id) #文章の単語数を指定の境界で切る
+    dump_id_discription(words_arrays) #単語数ごとに分割して出力
+    puts "Sort by number of words done."
+
+    words_arrays.each_with_index do |id_words, i|
+      words_freq = get_words_freq(id_words)
+      dump_words_freq(words_freq, i) #設定境界で単語数出力
+    end
+    puts "Word frequency has calculated."
+  end
+  
+  def dump_words_freq(words_freq, index)
+    filename = ""
+    save_dir = "./words_freq"
     
-    run_genia
-    grouped_data.each do |id_words|
-      id, words = id_words
-      result = get_word_freq(words)
-      open(File.join(@out_dir, id + "_result")){|f| f.puts(result) }
+    if !File.exist?(save_dir) #フォルダが存在しなかったら作成
+      Dir.mkdir(save_dir)
     end
-    @socket.close
-  end
-  
-  def count_words
-    # remove items with no description, return array of description and wordcount
-    words_with_num = @data.map do |id, description|
-      num_of_words = wordcounter(description)
-      [id, description, num_of_words] if num_of_words != 0
+    
+    if index < @set_borders.length
+      filename = @set_borders[index].to_s + "_words_and_under_freq.txt"
+    else
+      filename = "over_" + @set_borders[-1].to_s + "_words_freq.txt"
     end
-    words_with_num.compact
+    
+    output = open(save_dir+"/"+filename, "w") #出力ファイル展開
+    
+    words_freq.each do |word, freq|
+      output.write(word + "\t" + freq.to_s + "\n")
+    end
+      
+    output.close
   end
   
-  def wordcounter(description)
-    description.split(/\s+/).size
+  def get_words_freq(id_words) #文章からの単語リストを作成
+    word_list = Hash.new #出現単語数を数えるハッシュ
+    
+    id_words.each do |id, num|
+      puts @original_hash[id]
+      result = @genia.tagger_sentence(@original_hash[id]).chomp
+      
+      result.each_line do |line|
+        elements = line.split(/\t/) #タブ区切り
+        
+        if elements[2] =~ /^NN/ #名詞を回収
+          word = elements[1].downcase #小文字に直す
+          
+          if word_list.include?(word) #既に追加済なら
+            word_list[word] += 1
+          else #新規登録
+            word_list[word] = 1
+          end
+        end
+      end
+    end
+    #出現回数が多い順に並び替え
+    return word_list.sort{|a,b| b[1] <=> a[1]}
   end
   
-  def group_by_criteria(word_counted)
-    # items grouped by num_of_words and return an array of non-redundant description
-    @wordcount_criteria.map.with_index do |upper_limit, index|
-      lower_limit = index == 0 ? 0 : @wordcount_criteria[index - 1]
-      members = word_counted.select do |array|
-        size = array[2]
-        lower_limit < size && size =< upper_limit
+  def dump_id_discription(words_arrays)
+    save_dir = "./words_divided"
+    
+    if !File.exist?(save_dir) #フォルダが存在しなかったら作成
+      Dir.mkdir(save_dir)
+    end
+    
+    @set_borders.each_with_index do |border, i|
+      filename = border.to_s + "_words_and_under.txt"
+      output = open(save_dir+"/"+filename, "w") #出力ファイル展開
+    
+      words_arrays[i].each do |id, num|
+        output.write(id)
+        output.write("\t")
+        output.write(@original_hash[id])
+        output.write("\n")
       end
       
-      non_redundant = members.map{|array| select_distinct(array[1]) }
-      [upper_limit, non_redundant]
+      output.close
+    end
+    
+    filename = "over_" + @set_borders[-1].to_s + "_words.txt"
+    output = open(save_dir+"/"+filename, "w") #出力ファイル展開
+    
+    words_arrays[-1].each do |id, num|
+      output.write(id)
+      output.write("\t")
+      output.write(@original_hash[id])
+      output.write("\n")
     end
   end
   
-  def no_description
-    @data.select{|id, description| wordcounter(description) == 0 }
-  end
-  
-  def run_genia
-    pid = fork #子プロセス実体化
-    if !pid #子プロセスで処理
-      system("ruby ../GENIA_server/GENIA_server.rb")      
-      exit!(0) #子プロセス終了
+  def divide_words(sorted_id) #id-単語数リストを分割
+    words_arrays = Array.new
+    border_pos = 0 #境界配列の現在参照
+    last_border = 0 #前回の境界位置
+    
+    sorted_id.each_with_index do |(id, words), i|
+      if words > @set_borders[border_pos]
+        words_arrays.push(sorted_id.slice(last_border...i))
+        border_pos +=1
+        last_border = i #境界位置記憶
+        
+        if border_pos > @set_borders.length
+          break #サイズを超えたら終了
+        end
+      end
     end
+    #最後を追加
+    words_arrays.push(sorted_id.slice(last_border..-1))
+    return words_arrays
   end
   
-  def get_word_freq(words_array)
-    bag_of_words = words_array.flatten.join("\s")
-    @socket.puts bag_of_words
-    @socket.gets.gsub(" ", "\n").chomp
+  def sort_words #オブジェクトのハッシュから文章単語数を回収
+    words_hash = Hash.new #単語数保存用のハッシュを作成
+    
+    @original_hash.each do |id, discription|
+      words = discription.split(/\s+/).length #スペースで区切って単語数
+      words_hash[id] = words
+    end
+    
+    word_list = words_hash.sort{|a,b| a[1] <=> b[1]}
+    words0_pos = 0 #単語数が0より多くなるArray座標
+    
+    word_list.each_with_index do |(id, words), i|
+      if words > 0 #単語数0より大きくなったら
+        words0_pos = i
+        break
+      end
+    end
+    #idと単語数のハッシュを返す
+    word_list = word_list.slice(words0_pos..-1)
   end
 end
 
-if __FILE__ == $0
-  data = open(ARGV.first){|f| JSON.load(f) }
-  criteria = [20, 40, 60];
-
-  wc = WordCount.new(data, criteria)
-  nodesc = wc.no_description
-  result = wc.run_process
+#以下エントリーポイント
+if __FILE__==$0
+  dummy_hash = Hash.new #{id, sentence}
+  dummy_hash["10"]="This is a pen."
+  dummy_hash["20"]="Have you been in Kobe last week?"
+  dummy_hash["30"]="Hello, world!"
+  dummy_hash["40"]="You have a pen."
+  dummy_borders = [2, 5]
+  
+  word_count = WordCount.new(dummy_hash, dummy_borders)
 end
