@@ -1,11 +1,11 @@
 #!/usr/bin/ruby
 # coding: utf-8
-require 'socket'
 require 'fileutils'
+require './GENIA_controller'
 
 class WordCount
   def initialize(discription_hash, word_borders)
-    @socket = TCPSocket.open("localhost", 7070) #GENIA通信用ソケット
+    @genia = GENIA_controller.new("../GENIA_server") #GENIAで品詞解析
     @original_hash = discription_hash
     @set_borders = word_borders
     
@@ -52,8 +52,8 @@ class WordCount
     word_list = Hash.new #出現単語数を数えるハッシュ
     
     id_words.each do |id, num|
-      @socket.puts @original_hash[id].gsub("\n", " ")
-      result = @socket.gets.gsub(" ", "\n").chomp
+      puts @original_hash[id]
+      result = @genia.tagger_sentence(@original_hash[id]).chomp
       
       result.each_line do |line|
         elements = line.split(/\t/) #タブ区切り
