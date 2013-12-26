@@ -1,22 +1,20 @@
-#!/usr/bin/ruby
-# coding: utf-8
+# -*- coding: utf-8 -*-
 
 require 'fileutils'
 require './GENIA_controller'
 
 class WordCount
-  def initialize(discription_hash, word_borders)
-    @genia = GENIA_controller.new("../GENIA_server") #GENIAで品詞解析
-    @original_hash = discription_hash
+  def initialize(genia_path, description_hash, word_borders)
+    @genia = GENIA_controller.new(genia_path)
+    @original_hash = description_hash
     @set_borders = word_borders
-    
     run_process
   end
   
   def run_process
     sorted_id = sort_words #ハッシュの文章の単語数でソート
     words_arrays = divide_words(sorted_id) #文章の単語数を指定の境界で切る
-    dump_id_discription(words_arrays) #単語数ごとに分割して出力
+    dump_id_description(words_arrays) #単語数ごとに分割して出力
     puts "Sort by number of words done."
 
     words_arrays.each_with_index do |id_words, i|
@@ -74,7 +72,7 @@ class WordCount
     return word_list.sort{|a,b| b[1] <=> a[1]}
   end
   
-  def dump_id_discription(words_arrays)
+  def dump_id_description(words_arrays)
     save_dir = "./words_divided"
     
     if !File.exist?(save_dir) #フォルダが存在しなかったら作成
@@ -127,25 +125,44 @@ class WordCount
     return words_arrays
   end
   
-  def sort_words #オブジェクトのハッシュから文章単語数を回収
-    words_hash = Hash.new #単語数保存用のハッシュを作成
-    
-    @original_hash.each do |id, discription|
-      words = discription.split(/\s+/).length #スペースで区切って単語数
-      words_hash[id] = words
+  def desc_group_by_criteria
+    id_group_by_criteria.map do |range_member|
+      desc = range_member.map{|id| @original_hash[id] }
+      desc.flatten
     end
-    
-    word_list = words_hash.sort{|a,b| a[1] <=> b[1]}
-    words0_pos = 0 #単語数が0より多くなるArray座標
-    
-    word_list.each_with_index do |(id, words), i|
-      if words > 0 #単語数0より大きくなったら
-        words0_pos = i
-        break
+  end
+  
+  def id_group_by_criteria
+    border_ranges.map do |range|
+      members = wordcounter.select{|n| range.include?(n[1]) }
+      members.map{|n| n.first }
+    end
+  end
+  
+  def border_ranges
+    borders = [0] + @set_borders
+    borders.map.with_index do |num, index|
+      case index
+      when borders.size - 1
+        num..Float::INFINITY
+      else
+        num..borders[index+1]
       end
     end
-    #idと単語数のハッシュを返す
-    word_list = word_list.slice(words0_pos..-1)
+  end
+  
+  def no_description
+    members = wordcounter.select{|n| n[1] == 0 }
+    members.map{|n| n.first }
+  end
+  
+  def wordcounter
+    hash = {}
+    @original_hash.each_pair do |id, desc|
+      words_size = desc.split(/\s+/).size
+      words_hash[id] = words_size
+    end
+    hash.sort_by{|k,v| v }
   end
 end
 
