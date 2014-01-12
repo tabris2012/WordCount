@@ -2,31 +2,24 @@
 
 class GENIAController
   def initialize(genia_path)
-    @genia = IO.popen("cd " + genia_path + " ; ./geniatagger 2>/dev/null", "r+")
+    @genia = IO.popen("cd #{genia_path} && ./geniatagger 2>/dev/null", "r+")
   end
   
-  def tagger_sentence(sentence)
-    # count line number
-    line_num  = 1 + sentence.scan("\n").size
-    
-    # 行末で改行してgeniaプロセスに投げ込む
-    @genia.print sentence + "\n"
-    
-    result = []
-    while line = @genia.gets
-      puts line
-      if line == "\n"
-        line_num -=1 #残り行数を減らす
-        break if line_num == 0
-      else
-        result << line
-      end
+  def tagger(sentence)
+    @genia.print(sentence + "\n")
+    array = []
+    loop do
+      line = @genia.gets
+      break if line == "\n"
+      array << line
     end
-
-    result.join
+    array
+  end
+  
+  def close
+    @genia.close
   end
 end
-
 
 #以下エントリーポイント
 if __FILE__==$0

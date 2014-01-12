@@ -9,6 +9,7 @@ class WordCount
     @original_hash = description_hash
     @set_borders = word_borders
   end
+  attr_reader :original_hash
   
   def run_process
     # arrays of desc grouped by number of words
@@ -19,12 +20,15 @@ class WordCount
     
     # save result in json format with filename of current time
     open(File.join(@target_dir,Time.now.to_s+".json"),"w"){|f| JSON.load(words_freq, f) }
+    
+    # close IO port
+    @genia.close
   end
   
   def get_words_freq(bag_of_words)
-    result = @genia.tagger_sentence(bag_of_words).chomp
+    result = @genia.tagger(bag_of_words)
     hash = {}
-    result.readlines.each do |line_t|
+    result.each do |line_t|
       line = line_t.split("\t")
       if line[2] =! /^NN/
         word = line[1].downcase
@@ -70,7 +74,7 @@ class WordCount
     hash = {}
     @original_hash.each_pair do |id, desc|
       words_size = desc.split(/\s+/).size
-      words_hash[id] = words_size
+      hash[id] = words_size
     end
     hash.sort_by{|k,v| v }
   end
