@@ -55,13 +55,13 @@ class WordCount
   end
   
   def id_group_by_criteria
-    border_ranges.map do |range|
+    borders_to_ranges.map do |range|
       members = wordcounter.select{|n| range.include?(n[1]) }
       members.map{|n| n.first }
     end
   end
   
-  def border_ranges
+  def borders_to_ranges
     borders = [0] + @set_borders
     borders.map.with_index do |num, index|
       case index
