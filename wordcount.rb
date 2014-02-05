@@ -11,6 +11,14 @@ class WordCount
   end
   attr_reader :original_hash
   
+  def self.array_to_hash(array)
+    hash = {}
+    array.each do |id_desc|
+      hash[id_desc[0]] = id_desc[1].gsub(/\s+/,"\s")
+    end
+    hash
+  end
+  
   def run_process
     # arrays of desc grouped by number of words
     desc_groups = desc_group_by_criteria
@@ -81,13 +89,9 @@ class WordCount
 end
 
 if __FILE__ == $0
-  dummy_hash = Hash.new
-  dummy_hash["10"]="This is a pen."
-  dummy_hash["20"]="Have you been in Kobe last week?"
-  dummy_hash["30"]="Hello, world!"
-  dummy_hash["40"]="You have a pen."
-  dummy_borders = [2, 5]
-  
-  wc = WordCount.new("../GENIA_server", dummy_hash, dummy_borders)
+  design_description = open("./result.json"){|f| JSON.load(f) }
+  hash = WordCount.array_to_hash(design_description)
+  borders = [20,50,100]
+  wc = WordCount.new("./geniatagger", hash, borders)
   wc.run_process
 end
