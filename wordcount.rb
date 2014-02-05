@@ -34,7 +34,7 @@ class WordCount
   end
   
   def get_words_freq(bag_of_words)
-    result = @genia.tagger(bag_of_words)
+    result = @genia.tagger(bag_of_words.join("\s"))
     hash = {}
     result.each do |line_t|
       line = line_t.split("\t")
